@@ -9,6 +9,7 @@ from fields.purchase_order import PO_FIELDS, PO_LINE_FIELDS, PO_VENDOR_FIELDS
 logger = logging.getLogger(__name__)
 
 WAREHOUSE = os.environ["WMS_WAREHOUSE"]
+COMPANY = os.environ["WMS_COMPANY"]
 
 @tool
 def get_PO_list(
@@ -189,7 +190,6 @@ def get_all_PO_vendor(
         return {
             "error": "skipCount cannot be negative."
         }
-    COMPANY = os.environ["WMS_COMPANY"]
     MAX_RESULT_COUNT = 20
 
     data = call_wms(
