@@ -203,17 +203,18 @@ def get_all_PO_vendor(
         },
     )
     
+    items = data.get("items", [])
+    has_more = data.get("hasMore", False)
     return {
         "vendors": [
             pick(vendor, PO_VENDOR_FIELDS)
-            for vendor in data
+            for vendor in items
         ],
-        "returnedRows": len(data),
-        "currentSkipCount": skipCount,
-        "mayHaveMore": len(data) == MAX_RESULT_COUNT,
+        "totalCount": data.get("totalCount", 0),
+        "hasMore": has_more,
         "nextSkipCount": (
-            skipCount + len(data)
-            if len(data) == MAX_RESULT_COUNT
+            skipCount + len(items)
+            if has_more
             else None
         ),
     }
