@@ -9,8 +9,7 @@ logging.basicConfig(
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s"
 )
 
-from tools.purchase_order import get_PO_list, get_PO_detail, get_all_PO_vendor
-from tools.helpers import get_datetime, basic_calculator, calculate_percentage
+from tools import tools
 
 load_dotenv()
 
@@ -199,17 +198,7 @@ RESPONSE RULES:
 
 agent = create_agent(
     model=model,
-    tools=[
-      # PO Tools
-      get_PO_list,
-      get_PO_detail,
-      get_all_PO_vendor,
-
-      # General Tools
-      get_datetime,
-      basic_calculator,
-      calculate_percentage
-    ],
+    tools=tools,
     system_prompt=system_prompt,
     middleware = [
       ToolCallLimitMiddleware(

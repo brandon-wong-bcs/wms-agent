@@ -140,7 +140,7 @@ The original [database guide](docs/database.md), [product guide](docs/products.m
 
 - `helpers/swagger_to_csv.py` exports API endpoints, parameters, and response fields from an OpenAPI document. It includes GET endpoints by default and supports `--filter`, `--out`, and `--all-methods`.
 - `helpers/get _models.py` lists models returned by Groq using `GROQ_API_KEY`.
-- `helpers/generate_tool_docs.py` is an unfinished tool-reference generator: it currently imports a `tools` collection that `tools/__init__.py` does not define.
+- `helpers/generate_tool_docs.py` generates `TOOLS.md` in the project root from the shared tool registry in `tools/__init__.py`. It reads tool descriptions and parameter schemas without starting the agent or calling the WMS API. Run it with `python helpers\generate_tool_docs.py` using the configured virtual environment and `.env` file.
 
 For example, export purchase-related endpoints from a local OpenAPI file:
 
