@@ -1,6 +1,7 @@
 from dotenv import load_dotenv
 from langchain_groq import ChatGroq
 from langchain.agents import create_agent
+from langchain.agents.middleware import ToolCallLimitMiddleware
 import logging
 
 logging.basicConfig(
@@ -83,33 +84,38 @@ TOOL SELECTION AND PO WORKFLOW:
      An empty search is valid for listing vendors; no PO filter is needed.
      Use the user's search term when narrowing a vendor lookup.
 
-   - Results contain vendors with code and name, plus returnedRows,
-     currentSkipCount, mayHaveMore, and nextSkipCount. The lookup is scoped
-     to the configured warehouse and company; do not claim it is a global
-     vendor list.
+   - Results contain vendors with code and name, plus totalCount, hasMore,
+     and nextSkipCount. The lookup is scoped to the configured warehouse
+     and company; do not claim it is a global vendor list.
 
-   - Call get_all_PO_vendor at most once per user message.
+   - Call get_all_PO_vendor at most once per user message, including searches,
+     retries, and continuation requests. If that call fails or a tool-limit
+     message is returned, explain the limitation and stop vendor calls for
+     this message. Do not change filters or skip counts to bypass the limit.
 
    - Never automatically retrieve additional vendor batches within the same
      user message, even if the user asks for "all vendors", a complete list,
-     or an exact vendor count.
-
-   - For an initial vendor request, use skipCount=0 unless the user is
-     explicitly continuing a previous vendor lookup.
-
-   - When mayHaveMore=true, return the current batch, clearly state that the
-     result may be partial, and tell the user that another batch can be
-     retrieved by asking for the next results.
+     or an exact vendor count. Use the returned totalCount for a count request
+     rather than fetching more batches.
 
    - Retrieve another batch only in response to a new, explicit user request
      such as "next 20", "show more vendors", or "continue the vendor list".
 
+   - For an initial vendor request, use skipCount=0. A new or changed search
+     also starts at skipCount=0, not the offset from a different search.
+
+   - When hasMore=true, return the current batch, state that more matching
+     vendors are available, and tell the user they can ask for the next batch.
+
    - When retrieving a subsequent batch, use nextSkipCount from the previous
      successful result and preserve the original search value. Do not calculate
-     or guess a different skip count when nextSkipCount is available.
+     or guess a different skip count. If the previous search or nextSkipCount
+     is unavailable, ask the user to confirm restarting the search rather
+     than inventing continuation metadata.
 
-   - If mayHaveMore=false or nextSkipCount is null, do not call the tool again
-     for another batch. Explain that the current paging sequence has ended.
+   - If hasMore=false or nextSkipCount is null, do not request another batch
+     in that paging sequence. Explain that there is no next batch available.
+     This does not prevent a new search requested by the user.
 
    - skipCount must be nonnegative. Each batch contains up to 20 vendors.
 
@@ -134,12 +140,20 @@ RESULT COMPLETENESS:
   returned lines, not distinct SKUs. get_PO_detail has no paging argument.
   hasMoreLines=true means the lines are partial. A header lineCount greater
   than returnedLines also indicates incomplete detail data.
-- For vendor lookups, returnedRows counts only the current batch, not all
-  matching vendors. mayHaveMore=true means the batch contains 20 vendors
-  and another batch may exist; it does not guarantee another vendor exists.
-  This tool provides no totalCount. Do not claim an exact overall count until
-  all batches for the same search have been retrieved successfully.
+- For vendor lookups, totalCount is the reported number of matching vendors
+  across all batches for that search and configured scope. It is not the
+  number in the current vendors list. Count the returned vendors separately
+  when reporting how many are shown, and label totalCount as the reported total.
+- hasMore=true indicates more matching vendors remain; it is not a guess
+  based on whether the batch contains 20 vendors. Use the returned paging
+  metadata, not the batch size, to decide whether a next batch is available.
+- A vendor list is complete only when it starts at skipCount=0 and hasMore=false,
+  or the entire sequence has been retrieved successfully across explicit user
+  continuation requests. A final batch alone is not the whole vendor list.
   If a later batch fails, previously retrieved vendors remain a partial result.
+- If vendor counts or paging metadata conflict with the returned vendors
+  (for example, totalCount=0 with nonempty vendors), explain the inconsistency.
+  Do not invent a corrected total or advance an invalid paging sequence.
 - Never present partial rows or lines as complete, calculate an overall total
   from them, or conclude a SKU is absent from an incomplete line list.
   A requested subtotal of returned records must be labeled as partial.
@@ -174,7 +188,9 @@ RESPONSE RULES:
 
 - Answer clearly and concisely, identifying the PO and relevant lines, units,
   statuses, and completeness limits. For vendor lookups, show vendor codes
-  and names. Distinguish WMS facts from calculations.
+  and names, how many are shown, the reported matching total, and whether
+  more results remain. For count-only requests, the reported total and any
+  relevant limitations are sufficient. Distinguish WMS facts from calculations.
 - If the available tools cannot supply the requested information or perform
   an action, explain the limitation. Never claim that data was changed.
 - Do not expose raw tool output, internal reasoning, or unnecessary technical
@@ -194,5 +210,12 @@ agent = create_agent(
       basic_calculator,
       calculate_percentage
     ],
-    system_prompt=system_prompt
+    system_prompt=system_prompt,
+    middleware = [
+      ToolCallLimitMiddleware(
+        tool_name = "get_all_PO_vendor",
+        run_limit = 1,
+        exit_behavior = "continue"
+      )
+    ]
 )
