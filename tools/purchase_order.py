@@ -102,7 +102,7 @@ def get_PO_list(
 
 @tool
 def get_PO_detail(
-    poHeaderId: int
+    purchaseOrderNo: str
 ) -> dict:
     """
     Retrieve detailed information for a single purchase order in the WMS.
@@ -110,9 +110,9 @@ def get_PO_detail(
     Use this tool when information about the individual lines of a purchase
     order is required, such as SKUs, quantities, UOMs, costs, or line statuses.
 
-    This tool requires the PO header ID returned by get_PO_list.
-    If the PO header ID is not known, use get_PO_list first to locate the
-    purchase order and obtain its PO header ID.
+    Requires the purchase order number. Do not call get_PO_list first for a
+    known purchase order number; this tool looks up the purchase order itself,
+    including closed purchase orders.
 
     Returns the purchase order header and its individual purchase order lines
 
@@ -120,24 +120,45 @@ def get_PO_detail(
     """
 
     logger.info(
-        "get_PO_detail called: poHeaderId = %r",
-        poHeaderId
+        "get_PO_detail called: purchaseOrderNo = %r",
+        purchaseOrderNo
     )
 
-    if poHeaderId <= 0:
+    purchaseOrderNo = purchaseOrderNo.strip()
+    if not purchaseOrderNo:
         return {
-            "error": "A valid PO header ID is required."
+            "error": "A purchase order number is required."
         }
 
+    found = call_wms(
+        "/api/app/purchase-order",
+        {
+            "WarehouseCode": WAREHOUSE,
+            "PurchaseOrderNo": purchaseOrderNo,
+            "IncludeClosed": True,
+            "MaxResultCount": 5,
+        },
+    )
+    matches = [
+        po for po in found.get("items", [])
+        if po.get("purchaseOrderNo") == purchaseOrderNo
+    ]
+    if len(matches) != 1:
+        return {
+            "error": f"{len(matches)} purchase orders matched '{purchaseOrderNo}'. "
+                     "Ask the user to confirm the purchase order number."
+        }
+    po_header_id = matches[0]["id"]
+
     data = call_wms(
-        f"/api/app/purchase-order/{poHeaderId}",
+        f"/api/app/purchase-order/{po_header_id}",
         {
             "warehouseCode": WAREHOUSE,
             "lineSkipCount": 0,
             "lineMaxResultCount": 100,
         },
     )
-    
+
     header = data.get("header", {})
     lines = data.get("lines", [])
     has_more_lines = data.get("hasMoreLines", False)

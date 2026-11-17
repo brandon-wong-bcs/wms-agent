@@ -9,7 +9,7 @@ The original synthetic SQLite warehouse database remains available for learning 
 | Tool | Purpose | Limits |
 | --- | --- | --- |
 | `get_PO_list` | Search PO headers by PO number, vendor, SKU, status, type code, or date range. | Requires at least one search filter; returns up to 25 headers. Closed POs are excluded unless `includeClosed=true`. |
-| `get_PO_detail` | Retrieve a PO header and its lines, including SKUs, quantities, UOMs, costs, and statuses. | Requires a positive header ID, normally obtained from `get_PO_list`; requests up to 100 lines. |
+| `get_PO_detail` | Retrieve a PO header and its lines, including SKUs, quantities, UOMs, costs, and statuses. | Requires a PO number and resolves the header ID internally (including closed POs); requests up to 100 lines. |
 | `get_all_PO_vendor` | Search or list PO vendor codes and names for the configured warehouse and company. | Returns up to 20 vendors per batch. The agent retrieves another batch only when the user explicitly asks for more. |
 | `get_datetime` | Get the current local date and time. | Uses the machine's local time. |
 | `basic_calculator` | Add, subtract, multiply, or divide two numbers. | Division by zero returns an error message. |
