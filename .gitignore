@@ -13,6 +13,7 @@ __pycache__/
 /warehouse.db-*
 
 /to_do.md
+/docs/improvement_plan.md
 
 # Local token-usage logs
 /logs/
