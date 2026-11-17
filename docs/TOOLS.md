@@ -40,9 +40,9 @@ Retrieve detailed information for a single purchase order in the WMS.
 Use this tool when information about the individual lines of a purchase
 order is required, such as SKUs, quantities, UOMs, costs, or line statuses.
 
-This tool requires the PO header ID returned by get_PO_list.
-If the PO header ID is not known, use get_PO_list first to locate the
-purchase order and obtain its PO header ID.
+Requires the purchase order number. Do not call get_PO_list first for a
+known purchase order number; this tool looks up the purchase order itself,
+including closed purchase orders.
 
 Returns the purchase order header and its individual purchase order lines
 
@@ -52,7 +52,7 @@ This tool retrieves a single purchase order's details only and does not search f
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
-| `poHeaderId` | integer | Yes |  |
+| `purchaseOrderNo` | string | Yes |  |
 
 ## `get_all_PO_vendor`
 

@@ -52,7 +52,7 @@ def main():
 
     from tools import tools
 
-    output_path = PROJECT_ROOT / "TOOLS.md"
+    output_path = PROJECT_ROOT / "docs/TOOLS.md"
     output_path.write_text(render_tool_docs(tools), encoding="utf-8")
     print(f"Generated {output_path} containing {len(tools)} tools.")
 
