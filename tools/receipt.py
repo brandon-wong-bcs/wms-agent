@@ -11,15 +11,15 @@ logger = logging.getLogger(__name__)
 WAREHOUSE = os.environ["WMS_WAREHOUSE"]
 
 @tool
-def get_Receipt_List(
-    receiptNo: str = ""
-    poNo: str = ""
-    hostHeaderNo: str = ""
-    receiptStatus: str = ""
-    vendorCode: str = ""
-    dateFrom: str = ""
-    dateTo: str = ""
-    includeCompleted: bool = False
+def get_receipt_list(
+    receiptNo: str = "",
+    poNo: str = "",
+    hostHeaderNo: str = "",
+    receiptStatus: str = "",
+    vendorCode: str = "",
+    dateFrom: str = "",
+    dateTo: str = "",
+    includeCompleted: bool = False,
 ) -> dict:
     """
     Search for receipts in the WMS
@@ -42,7 +42,7 @@ def get_Receipt_List(
     """
 
     logger.info(
-        "get_Receipt_List called: "
+        "get_receipt_list called: "
         "receiptNo=%r poNo=%r hostHeaderNo=%r receiptStatus=%r "
         "vendorCode=%r dateFrom=%r dateTo=%r includeCompleted=%r",
         receiptNo,
@@ -85,4 +85,107 @@ def get_Receipt_List(
         },
     )
 
-    # return object
+    items = data.get("items", [])
+    total_count = data.get("totalCount")
+
+    return {
+        "rows": [
+            pick(item, RECEIPT_FIELDS)
+            for item in items
+        ],
+        "returnedRows": len(items),
+        "totalCount": total_count,
+    }
+
+@tool
+def get_receipt_detail(
+    receiptNo: str,
+    skipCount: int = 0
+) -> dict:
+# /api/app/receipt/detail-list
+    """
+    Retrieve detailed line information for a single receipt in the WMS.
+
+    Use this tool for receipt item details, including product and LPN
+    information, quantities and units, inventory and putaway information,
+    lot attributes, dates, and receiving restrictions.
+
+    Requires the receipt number (for example REC26072800006). Do not call
+    get_receipt_list first for a known receipt number.
+    skipCount is the number of lines to skip for paging. Use 0 for the
+    first page, then the returned nextSkipCount.
+
+    Returns the receipt's lines in items, plus totalCount, hasMore and
+    nextSkipCount. This endpoint does not return a receipt header.
+
+    This tool retrieves a single receipt's lines only and does not search
+    for receipts.
+    """
+    
+    logger.info(
+        "get_receipt_detail called: receiptNo = %r, skipCount = %r",
+        receiptNo,
+        skipCount,
+    )
+
+    receiptNo = receiptNo.strip()
+    if not receiptNo:
+        return {"error": "A receipt number is required."}
+    if skipCount < 0:
+        return {"error": "skipCount cannot be negative."}
+
+    found = call_wms(
+        "/api/app/receipt",
+        {
+            "WarehouseCode": WAREHOUSE,
+            "ReceiptNo": receiptNo,
+            "IncludeCompleted": True,
+            "MaxResultCount": 5,
+        },
+    )
+    matches = [
+        r for r in found.get("items", [])
+        if r.get("receiptNo") == receiptNo
+    ]
+    if len(matches) != 1:
+        return {"error": f"{len(matches)} receipts matched '{receiptNo}'. Ask the user to confirm the receipt number."}
+    header_id = matches[0]["receiptHeaderId"]
+
+    data = call_wms(
+        "/api/app/receipt/detail-list",
+        {
+            "ReceiptHeaderId": header_id,
+            "SkipCount": skipCount,
+        },
+    )
+
+    items = data.get("items", [])
+    total_count = data.get("totalCount")
+    has_more = (
+        skipCount + len(items) < total_count
+        if total_count is not None
+        else None
+    )
+
+    if not items and has_more:
+        return {
+            "error": "Receipt API returned an empty page before the reported total was reached."
+        }
+
+    return {
+        "receiptNo": receiptNo,
+        "items": [pick(item, RECEIPT_LINE_FIELDS) for item in items],
+        "totalCount": total_count,
+        "hasMore": has_more,
+        "nextSkipCount": (
+            skipCount + len(items)
+            if has_more
+            else None
+        ),
+    }
+
+'''
+@tool
+def get_receipt_container():
+#  /api/app/receipt/{id}z
+'''

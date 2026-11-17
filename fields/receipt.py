@@ -5,7 +5,6 @@ RECEIPT_FIELDS = [
     "companyName", 
     "receiptNo", 
     "poNo", 
-    "hostHeaderNo", 
     "receiptType", 
     "receiptTypeName", 
     "poDate", 
@@ -29,6 +28,27 @@ RECEIPT_FIELDS = [
 ]
 
 RECEIPT_LINE_FIELDS = [
+    "receiptDetailId",
+     "lineNumber",
+     "sku",
+     "itemDescription",
+     "lpn",
+     "requestedQuantity",
+     "receivedQuantity",
+     "pendingQuantity",
+     "quantityUnit",
+     "packUomCode",
+     "inventoryStatus",
+     "putawayRule",
+     "lot01",
+     "lot02",
+     "lot03",
+     "lot04",
+     "lot05",
+     "expiryDate",
+     "manufactureDate",
+     "holdHour",
+     "allowEarlyExpiry",
 ]
 
 RECEIPT_CONTAINER_FIELDS = [
