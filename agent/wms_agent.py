@@ -18,7 +18,7 @@ load_dotenv()
 model = ChatGroq(
    #qwen/qwen3.8-27b : the dumber alternative
     model="openai/gpt-oss-120b",
-    max_tokens = 800,
+    max_tokens = 1000,
     reasoning_effort="medium",
     reasoning_format="parsed"
 )
@@ -96,10 +96,32 @@ TOOL WORKFLOWS:
    A "[context: activeReceipt ...]" line is system-provided state from the
    last receipt detail call. For "next page" or "more lines" requests, reuse
    that receiptNo and nextSkipCount instead of searching again.
-   A "[ui-note: ...]" message records a page the user loaded with the UI's
-   Load more button. Those lines were shown to the user, not to you. Do not
-   claim to know their content; call get_receipt_detail with that skipCount
-   only if you need the data to answer.
+   A "[ui-note: ...]" message records rows the user loaded with the UI's
+   Load more button. Those rows are already on the user's screen; do not
+   re-fetch them or claim to know their content. To continue or show more,
+   fetch from the skipCount stated in the note (the next unseen row).
+   Row positions follow API order, which sorts lineNumber as text (1, 10,
+   11, ... 19, 2, 20), so rows are not line numbers; never infer a
+   lineNumber from a row position.
+
+6. get_receipt_container returns the containers (LPNs) already received
+   against a single receipt, while get_receipt_detail returns the lines
+   expected. Use container for what was actually received, LPN, putaway
+   location, or container status; use detail for what was expected or still
+   pending. It requires receiptNo and supports skipCount (nonnegative,
+   default 0). It looks up the receipt itself, so do not call
+   get_receipt_list first for a known receipt number. Results are items,
+   totalCount, hasMore, nextSkipCount, with no header.
+   Paging rules match get_receipt_detail: begin at skipCount=0, fetch ONE
+   page per user message and report it as partial; only a new explicit
+   continuation request authorizes another page, using the SAME receiptNo and
+   the previous nextSkipCount. Stop at hasMore=false, hasMore=null, errors,
+   empty premature pages, or offsets that do not advance. The activeReceipt
+   context and ui-note apply to get_receipt_detail only; for container
+   paging use the nextSkipCount returned by get_receipt_container.
+   There is no SKU/LPN filter or page-size argument; inspect items for
+   matches. A receipt with no containers has not necessarily received
+   nothing: an empty successful result means no containers returned.
 
 COMPLETENESS:
 - PO and receipt lists return at most 25 headers, rows, returnedRows, and
@@ -112,8 +134,9 @@ COMPLETENESS:
 - Vendor totalCount counts all matching vendors, not the current batch.
   Use returned hasMore, not batch size, to indicate further results.
 - Receipt detail totalCount counts lines, not SKUs, quantities, or headers.
-  Count items for the current page. hasMore=null means an unknown total;
-  nextSkipCount=null then does not establish completion.
+  Receipt container totalCount counts containers, not lines, SKUs, or
+  quantities. Count items for the current page. hasMore=null means an
+  unknown total; nextSkipCount=null then does not establish completion.
 - A complete paged list requires a successful sequence from offset 0 to its
   end. A final page alone is not the entire list. Keep document IDs separate,
   avoid duplicate pages, and flag inconsistent counts/metadata.
@@ -135,6 +158,11 @@ QUANTITIES AND CALCULATIONS:
   allowEarlyExpiry describe returned receipt records. Do not invent code/lot
   meanings or policy effects, or infer current stock availability, location
   balances, or completed putaway.
+- Container quantity is the quantity in that container, in its quantityUnit;
+  it is not a receipt line's receivedQuantity unless line and container data
+  are both complete and units match. Keep containerStatus, inventoryStatus,
+  and putawayLocation as returned. unitCostPrice, foc, and priceReference
+  are per container record; do not total cost or infer currency.
 - Use basic_calculator for arithmetic (add/subtract/multiply/divide) and
   calculate_percentage(part, total) for percentages. Never divide by zero.
 - Use get_datetime for relative dates before date filters. Clarify material
@@ -161,6 +189,11 @@ agent = create_agent(
       ),
       ToolCallLimitMiddleware(
         tool_name = "get_receipt_detail",
+        run_limit = 1,
+        exit_behavior = "continue"
+      ),
+      ToolCallLimitMiddleware(
+        tool_name = "get_receipt_container",
         run_limit = 1,
         exit_behavior = "continue"
       ),

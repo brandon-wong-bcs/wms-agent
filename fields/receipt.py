@@ -52,4 +52,24 @@ RECEIPT_LINE_FIELDS = [
 ]
 
 RECEIPT_CONTAINER_FIELDS = [
+    "receiptContainerId",
+    "receiptDetailId",
+    "lineNumber",
+    "lpn",
+    "sku",
+    "itemDescription",
+    "quantity",
+    "quantityUnit",
+    "packUomCode",
+    "containerStatus",
+    "inventoryStatus",
+    "putawayLocation",
+    "lot01",
+    "lot02",
+    "lot03",
+    "receivedDate",
+    "expiryDate",
+    "unitCostPrice",
+    "foc",
+    "priceReference",
 ]

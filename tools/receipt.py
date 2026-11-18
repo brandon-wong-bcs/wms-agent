@@ -184,8 +184,92 @@ def get_receipt_detail(
         ),
     }
 
-'''
 @tool
-def get_receipt_container():
-#  /api/app/receipt/{id}z
-'''
+def get_receipt_container(
+    receiptNo: str,
+    skipCount: int = 0
+) -> dict:
+# /api/app/receipt/container-list
+    """
+    Retrieve the containers (LPNs) already received against a single receipt
+    in the WMS.
+
+    Use this tool for what has actually been received: LPN, SKU, received
+    quantity and unit, container and inventory status, putaway location,
+    lot attributes, received and expiry dates, and cost. For what is expected
+    to be received, use get_receipt_detail instead.
+
+    Requires the receipt number (for example REC26072800006). Do not call
+    get_receipt_list first for a known receipt number.
+    skipCount is the number of containers to skip for paging. Use 0 for the
+    first page, then the returned nextSkipCount.
+
+    Returns the receipt's containers in items, plus totalCount, hasMore and
+    nextSkipCount. This endpoint does not return a receipt header.
+
+    This tool retrieves a single receipt's containers only and does not
+    search for receipts.
+    """
+
+    logger.info(
+        "get_receipt_container called: receiptNo = %r, skipCount = %r",
+        receiptNo,
+        skipCount,
+    )
+
+    receiptNo = receiptNo.strip()
+    if not receiptNo:
+        return {"error": "A receipt number is required."}
+    if skipCount < 0:
+        return {"error": "skipCount cannot be negative."}
+
+    found = call_wms(
+        "/api/app/receipt",
+        {
+            "WarehouseCode": WAREHOUSE,
+            "ReceiptNo": receiptNo,
+            "IncludeCompleted": True,
+            "MaxResultCount": 5,
+        },
+    )
+
+    matches = [
+        r for r in found.get("items", [])
+        if r.get("receiptNo") == receiptNo
+    ]
+    if len(matches) != 1:
+        return {"error": f"{len(matches)} receipts matched '{receiptNo}'. Ask the user to confirm the receipt number."}
+    header_id = matches[0]["receiptHeaderId"]
+
+    data = call_wms(
+        "/api/app/receipt/container-list",
+        {
+            "ReceiptHeaderId": header_id,
+            "SkipCount": skipCount,
+        },
+    )
+
+    items = data.get("items", [])
+    total_count = data.get("totalCount")
+    has_more = (
+        skipCount + len(items) < total_count
+        if total_count is not None
+        else None
+    )
+
+    if not items and has_more:
+        return {
+            "error": "Receipt API returned an empty page before the reported total was reached."
+        }
+
+    return {
+        "receiptNo": receiptNo,
+        "items": [pick(item, RECEIPT_CONTAINER_FIELDS) for item in items],
+        "totalCount": total_count,
+        "hasMore": has_more,
+        "nextSkipCount": (
+            skipCount + len(items)
+            if has_more
+            else None
+        ),
+    }
