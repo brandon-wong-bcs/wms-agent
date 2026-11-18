@@ -1,25 +1,20 @@
 import streamlit as st
 from groq import APIError
-from agent.runner import stream_turn, load_receipt_page, receipt_state
+from agent.runner import stream_turn, load_receipt_page, receipt_state, get_active_receipt
 import uuid
-
-if "active_receipt" not in st.session_state:
-    st.session_state.active_receipt = None
 
 if "thread_id" not in st.session_state:
     st.session_state.thread_id = str(uuid.uuid4())
 
-# Receipt line pages the user loaded with the button (display only)
 if "extra_pages" not in st.session_state:
     st.session_state.extra_pages = []
 
 if "page_error" not in st.session_state:
     st.session_state.page_error = None
 
-
 def load_next_page():
     """Button callback: fetch the next receipt page without the LLM."""
-    ar = st.session_state.active_receipt
+    ar = get_active_receipt(st.session_state.thread_id)
     try:
         result = load_receipt_page(
             st.session_state.thread_id, ar["receiptNo"], ar["nextSkipCount"]
@@ -34,7 +29,6 @@ def load_next_page():
         return
     st.session_state.page_error = None
     st.session_state.extra_pages.append(result["items"])
-    st.session_state.active_receipt = state
 
 st.title("Warehouse AI Assistant")
 
@@ -97,15 +91,8 @@ if prompt:
             for kind, payload in stream_turn(
                 st.session_state.thread_id,
                 prompt,
-                st.session_state.active_receipt,
             ):
-                if kind == "receipt_state":
-                    previous = st.session_state.active_receipt
-                    if not previous or previous["receiptNo"] != payload["receiptNo"]:
-                        st.session_state.extra_pages = []
-                    st.session_state.page_error = None
-                    st.session_state.active_receipt = payload
-                elif kind == "reasoning":
+                if kind == "reasoning":
                     full_reasoning += payload
                     reasoning_placeholder.markdown(full_reasoning)
                 elif kind == "answer":
@@ -136,7 +123,7 @@ if prompt:
 for page in st.session_state.extra_pages:
     st.dataframe(page, use_container_width=True)
 
-ar = st.session_state.active_receipt
+ar = get_active_receipt(st.session_state.thread_id)
 if ar and ar["hasMore"]:
     st.button(
         f"Load more lines ({ar['nextSkipCount']} of {ar['totalCount']} loaded)",

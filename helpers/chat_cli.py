@@ -20,10 +20,6 @@ def main():
     # remember earlier turns, so follow-up questions work.
     thread_id = str(uuid.uuid4())
 
-    # Paging state from get_receipt_detail. In the Streamlit app this lives in
-    # st.session_state; here it is just a variable.
-    active_receipt = None
-
     print("Warehouse assistant. Type 'exit' to quit.\n")
 
     while True:
@@ -41,15 +37,11 @@ def main():
 
         try:
             # stream_turn yields (kind, payload) events as the agent works.
-            for kind, payload in stream_turn(thread_id, line, active_receipt):
+            for kind, payload in stream_turn(thread_id, line):
                 if kind == "answer":
                     # end="" keeps the text on one line, flush=True shows each
                     # chunk immediately so the answer appears to stream.
                     print(payload, end="", flush=True)
-                elif kind == "receipt_state":
-                    # Remember paging info so the next turn can use it.
-                    active_receipt = payload
-                # "reasoning" events are ignored here; only the answer is shown.
         except APIError as exc:
             # The runner does not catch model errors, so we do it here.
             print(f"\n[model error: {exc}]")
